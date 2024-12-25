@@ -18,6 +18,7 @@
 		D2939B1A2D1C25BB00A037AA /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B192D1C25BB00A037AA /* FirebaseAuth */; };
 		D2939B1C2D1C25BF00A037AA /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1B2D1C25BF00A037AA /* FirebaseCore */; };
 		D2939B202D1C27BF00A037AA /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1F2D1C27BF00A037AA /* FirebaseMessaging */; };
+		D2939B222D1C337800A037AA /* splash.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2939B212D1C337800A037AA /* splash.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,7 @@
 		D23D7AD32D1C226A0016B8D1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		D2939B1D2D1C26C800A037AA /* sohwagi_ios.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sohwagi_ios.entitlements; sourceTree = "<group>"; };
 		D2939B1E2D1C270C00A037AA /* sohwagi-ios-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "sohwagi-ios-Info.plist"; sourceTree = SOURCE_ROOT; };
+		D2939B212D1C337800A037AA /* splash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = splash.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +112,7 @@
 				D23D7AD32D1C226A0016B8D1 /* GoogleService-Info.plist */,
 				D23D7AA92D1C215D0016B8D1 /* sohwagi_iosApp.swift */,
 				D23D7AAB2D1C215D0016B8D1 /* ContentView.swift */,
+				D2939B212D1C337800A037AA /* splash.swift */,
 				D23D7AAD2D1C215D0016B8D1 /* Assets.xcassets */,
 				D23D7AAF2D1C215D0016B8D1 /* Preview Content */,
 			);
@@ -288,6 +291,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D23D7AAC2D1C215D0016B8D1 /* ContentView.swift in Sources */,
+				D2939B222D1C337800A037AA /* splash.swift in Sources */,
 				D23D7AAA2D1C215D0016B8D1 /* sohwagi_iosApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
