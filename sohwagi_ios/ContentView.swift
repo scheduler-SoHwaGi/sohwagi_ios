@@ -1,17 +1,7 @@
-//
-//  ContentView.swift
-//  sohwagi_ios
-//
-//  Created by 구나연 on 12/25/24.
-//
-
-//
-
-//
-
 import SwiftUI
 import AuthenticationServices
 import FirebaseMessaging
+import WebKit
 
 struct ContentView: View {
     @State private var showSplash = true // 스플래시 화면 표시 여부
@@ -19,7 +9,7 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             if showSplash {
-                LaunchView() // SplashView를 호출
+                LaunchView() // SplashView 호출
                     .onAppear {
                         // 1초 후 스플래시 화면 종료
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -36,6 +26,8 @@ struct ContentView: View {
 }
 
 struct LoginView: View {
+    @State private var showWebView = false // 웹뷰 표시 여부
+
     var body: some View {
         ZStack {
             // 배경 이미지 설정
@@ -69,6 +61,12 @@ struct LoginView: View {
                 }
                 .padding(.bottom, 50) // 하단 여백
             }
+
+            // 웹뷰
+            if showWebView {
+                WebViewWrapper(url: URL(string: "https://www.naver.com")!)
+                    .edgesIgnoringSafeArea(.all)
+            }
         }
     }
 
@@ -78,6 +76,9 @@ struct LoginView: View {
 
         let controller = ASAuthorizationController(authorizationRequests: [request])
         controller.delegate = AppleSignInCoordinator.shared
+        AppleSignInCoordinator.shared.showWebViewCallback = { show in
+            showWebView = show // 웹뷰 표시 여부 업데이트
+        }
         controller.presentationContextProvider = AppleSignInCoordinator.shared
         controller.performRequests()
     }
@@ -86,6 +87,7 @@ struct LoginView: View {
 // 애플 로그인 코디네이터
 class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     static let shared = AppleSignInCoordinator()
+    var showWebViewCallback: ((Bool) -> Void)?
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
@@ -99,7 +101,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 print("Full Name: \(fullNameString)")
                 UserDefaults.standard.set(fullNameString, forKey: "userFullName")
             } else {
-                // 저장된 이름 불러오기
                 let savedFullName = UserDefaults.standard.string(forKey: "userFullName") ?? "Name Not Available"
                 print("Full Name: \(savedFullName)")
             }
@@ -108,7 +109,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 print("Email: \(email)")
                 UserDefaults.standard.set(email, forKey: "userEmail")
             } else {
-                // 저장된 이메일 불러오기
                 let savedEmail = UserDefaults.standard.string(forKey: "userEmail") ?? "Email Not Available"
                 print("Email: \(savedEmail)")
             }
@@ -117,6 +117,9 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
             // FCM 토큰 가져오기
             fetchFCMToken()
+
+            // 웹뷰 열기
+            showWebViewCallback?(true)
         }
     }
 
@@ -126,8 +129,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 print("FCM 토큰 가져오기 실패: \(error.localizedDescription)")
             } else if let token = token {
                 print("FCM 토큰: \(token)")
-            } else {
-                print("FCM 토큰: Not Available")
             }
         }
     }
@@ -141,6 +142,21 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 }
 
+// WKWebView를 SwiftUI에서 사용하는 Wrapper
+struct WebViewWrapper: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        let request = URLRequest(url: url)
+        webView.load(request)
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        // 업데이트 로직 필요 없음
+    }
+}
 
 #Preview {
     ContentView()
