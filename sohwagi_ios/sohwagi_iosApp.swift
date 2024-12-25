@@ -2,7 +2,7 @@
 //  sohwagi_iosApp.swift
 //  sohwagi_ios
 //
-//  Created by 구나연 on 12/25/24.
+//  Created by 구나연 on 12/25/24.12
 //
 
 import SwiftUI
