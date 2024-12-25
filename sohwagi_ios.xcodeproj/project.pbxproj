@@ -14,6 +14,10 @@
 		D23D7ABB2D1C215D0016B8D1 /* sohwagi_iosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D23D7ABA2D1C215D0016B8D1 /* sohwagi_iosTests.swift */; };
 		D23D7AC52D1C215D0016B8D1 /* sohwagi_iosUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D23D7AC42D1C215D0016B8D1 /* sohwagi_iosUITests.swift */; };
 		D23D7AC72D1C215D0016B8D1 /* sohwagi_iosUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D23D7AC62D1C215D0016B8D1 /* sohwagi_iosUITestsLaunchTests.swift */; };
+		D23D7AD42D1C226A0016B8D1 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D23D7AD32D1C226A0016B8D1 /* GoogleService-Info.plist */; };
+		D2939B1A2D1C25BB00A037AA /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B192D1C25BB00A037AA /* FirebaseAuth */; };
+		D2939B1C2D1C25BF00A037AA /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1B2D1C25BF00A037AA /* FirebaseCore */; };
+		D2939B202D1C27BF00A037AA /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1F2D1C27BF00A037AA /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +48,9 @@
 		D23D7AC02D1C215D0016B8D1 /* sohwagi_iosUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = sohwagi_iosUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D23D7AC42D1C215D0016B8D1 /* sohwagi_iosUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = sohwagi_iosUITests.swift; sourceTree = "<group>"; };
 		D23D7AC62D1C215D0016B8D1 /* sohwagi_iosUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = sohwagi_iosUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		D23D7AD32D1C226A0016B8D1 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		D2939B1D2D1C26C800A037AA /* sohwagi_ios.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sohwagi_ios.entitlements; sourceTree = "<group>"; };
+		D2939B1E2D1C270C00A037AA /* sohwagi-ios-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "sohwagi-ios-Info.plist"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,6 +58,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D2939B202D1C27BF00A037AA /* FirebaseMessaging in Frameworks */,
+				D2939B1C2D1C25BF00A037AA /* FirebaseCore in Frameworks */,
+				D2939B1A2D1C25BB00A037AA /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +88,7 @@
 				D23D7AB92D1C215D0016B8D1 /* sohwagi_iosTests */,
 				D23D7AC32D1C215D0016B8D1 /* sohwagi_iosUITests */,
 				D23D7AA72D1C215D0016B8D1 /* Products */,
+				D2939B182D1C25BB00A037AA /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -94,6 +105,9 @@
 		D23D7AA82D1C215D0016B8D1 /* sohwagi_ios */ = {
 			isa = PBXGroup;
 			children = (
+				D2939B1E2D1C270C00A037AA /* sohwagi-ios-Info.plist */,
+				D2939B1D2D1C26C800A037AA /* sohwagi_ios.entitlements */,
+				D23D7AD32D1C226A0016B8D1 /* GoogleService-Info.plist */,
 				D23D7AA92D1C215D0016B8D1 /* sohwagi_iosApp.swift */,
 				D23D7AAB2D1C215D0016B8D1 /* ContentView.swift */,
 				D23D7AAD2D1C215D0016B8D1 /* Assets.xcassets */,
@@ -127,6 +141,13 @@
 			path = sohwagi_iosUITests;
 			sourceTree = "<group>";
 		};
+		D2939B182D1C25BB00A037AA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -143,6 +164,11 @@
 			dependencies = (
 			);
 			name = sohwagi_ios;
+			packageProductDependencies = (
+				D2939B192D1C25BB00A037AA /* FirebaseAuth */,
+				D2939B1B2D1C25BF00A037AA /* FirebaseCore */,
+				D2939B1F2D1C27BF00A037AA /* FirebaseMessaging */,
+			);
 			productName = sohwagi_ios;
 			productReference = D23D7AA62D1C215D0016B8D1 /* sohwagi_ios.app */;
 			productType = "com.apple.product-type.application";
@@ -215,6 +241,9 @@
 				Base,
 			);
 			mainGroup = D23D7A9D2D1C215D0016B8D1;
+			packageReferences = (
+				D23D7AD52D1C22CA0016B8D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			productRefGroup = D23D7AA72D1C215D0016B8D1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -233,6 +262,7 @@
 			files = (
 				D23D7AB12D1C215D0016B8D1 /* Preview Assets.xcassets in Resources */,
 				D23D7AAE2D1C215D0016B8D1 /* Assets.xcassets in Resources */,
+				D23D7AD42D1C226A0016B8D1 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -419,12 +449,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = sohwagi_ios/sohwagi_ios.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"sohwagi_ios/Preview Content\"";
 				DEVELOPMENT_TEAM = NB9CWVKQN2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "sohwagi-ios-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -435,7 +467,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sohwagi.ios.sohwagi-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sohwagi.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -448,12 +480,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = sohwagi_ios/sohwagi_ios.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"sohwagi_ios/Preview Content\"";
 				DEVELOPMENT_TEAM = NB9CWVKQN2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "sohwagi-ios-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -464,7 +498,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.sohwagi.ios.sohwagi-ios";
+				PRODUCT_BUNDLE_IDENTIFIER = com.sohwagi.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -588,6 +622,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D23D7AD52D1C22CA0016B8D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D2939B192D1C25BB00A037AA /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D23D7AD52D1C22CA0016B8D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		D2939B1B2D1C25BF00A037AA /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D23D7AD52D1C22CA0016B8D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		D2939B1F2D1C27BF00A037AA /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D23D7AD52D1C22CA0016B8D1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D23D7A9E2D1C215D0016B8D1 /* Project object */;
 }
