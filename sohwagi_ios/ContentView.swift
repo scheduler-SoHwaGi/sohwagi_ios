@@ -157,6 +157,12 @@ struct WebViewWrapper: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        
+        // 메시지 핸들러 추가
+        let contentController = webView.configuration.userContentController
+        contentController.add(context.coordinator, name: "logoutHandler")
+        contentController.add(context.coordinator, name: "deleteAccountHandler") // 회원탈퇴 핸들러 추가
+
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
 
@@ -164,6 +170,8 @@ struct WebViewWrapper: UIViewRepresentable {
         webView.load(request)
         return webView
     }
+
+
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         // JSON 데이터 준비
@@ -187,7 +195,7 @@ struct WebViewWrapper: UIViewRepresentable {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: WebViewWrapper
         var pendingUserInfo: String?
 
@@ -224,8 +232,24 @@ struct WebViewWrapper: UIViewRepresentable {
             }
         }
 
-
+        // JavaScript -> Swift 메시지 처리
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "logoutHandler", let messageBody = message.body as? String {
+                print("JavaScript sent message: \(messageBody)")
+                if messageBody == "logout" {
+                    print("User requested logout")
+                    // 로그아웃 처리 추가
+                }
+            } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
+                print("JavaScript sent message: \(messageBody)")
+                if messageBody == "deleteAccount" {
+                    print("User requested account deletion")
+                    // 회원탈퇴 처리 추가
+                }
+            }
+        }
     }
+
 }
 
 
