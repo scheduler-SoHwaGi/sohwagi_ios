@@ -96,10 +96,25 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             let userIdentifier = appleIDCredential.user
             let fullName = appleIDCredential.fullName
             let email = appleIDCredential.email
+            let authorizationCode = appleIDCredential.authorizationCode
+            let identityToken = appleIDCredential.identityToken
 
             var userInfo: [String: String] = [:]
 
-            // 최초 로그인 시 사용자 정보 저장
+            // authorizationCode와 identityToken 콘솔에 출력 추가
+            if let authorizationCode = authorizationCode,
+               let authCodeString = String(data: authorizationCode, encoding: .utf8) {
+                print("Authorization Code: \(authCodeString)")
+                userInfo["authorizationCode"] = authCodeString
+            }
+
+            if let identityToken = identityToken,
+               let tokenString = String(data: identityToken, encoding: .utf8) {
+                print("Identity Token: \(tokenString)")
+                userInfo["identityToken"] = tokenString
+            }
+
+            // 기존 사용자 정보 저장 로직
             if let givenName = fullName?.givenName, let familyName = fullName?.familyName {
                 let fullNameString = "\(givenName) \(familyName)"
                 userInfo["fullName"] = fullNameString
@@ -119,15 +134,14 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
             print("User Info: \(userInfo)")
 
-            // FCM 토큰 가져오기
+            // FCM 토큰 가져오기 및 웹뷰 호출
             fetchFCMToken { fcmToken in
                 userInfo["fcmToken"] = fcmToken
-
-                // 웹뷰 열기와 사용자 정보 전달
                 self.showWebViewCallback?(true, userInfo)
             }
         }
     }
+
 
     func fetchFCMToken(completion: @escaping (String?) -> Void) {
         Messaging.messaging().token { token, error in
