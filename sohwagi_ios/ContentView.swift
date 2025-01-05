@@ -149,7 +149,8 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                         print("Refresh Token: \(tokens["refreshToken"] ?? "N/A")")
                         UserDefaults.standard.set(tokens["accessToken"], forKey: "accessToken")
                         UserDefaults.standard.set(tokens["refreshToken"], forKey: "refreshToken")
-                        
+                        UserDefaults.standard.set(userInfo["authorizationCode"], forKey: "authorizationCode")
+
                         // FCM 토큰을 가져온 후 추가 API 호출
                         self.fetchFCMToken { fcmToken in
                             guard let fcmToken = fcmToken else {
@@ -171,7 +172,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 
     func postToAppleLoginAPI(authorizationCode: String, userName: String, completion: @escaping (Result<[String: String], Error>) -> Void) {
-        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/login/oauth/apple") else { return }
+        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/oauth/apple/login") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -270,7 +271,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
         }.resume()
     }
 
-
     func fetchFCMToken(completion: @escaping (String?) -> Void) {
         Messaging.messaging().token { token, error in
             if let error = error {
@@ -283,6 +283,63 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
         }
     }
 
+    func handleDeleteAccount() {
+        guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+              let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+            print("Access token or Refresh token not available.")
+            return
+        }
+
+        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/oauth/apple/revoke") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+        request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+        print("Preparing to send delete account request:")
+        print("Request URL: \(url)")
+        print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Failed to delete account: \(error.localizedDescription)")
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Invalid response from server.")
+                return
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("Successfully deleted account.")
+                
+                // 상태 초기화
+                DispatchQueue.main.async {
+                    // UserDefaults 초기화
+                    UserDefaults.standard.removeObject(forKey: "accessToken")
+                    UserDefaults.standard.removeObject(forKey: "refreshToken")
+                    UserDefaults.standard.removeObject(forKey: "authorizationCode")
+                    
+                    // 다른 API 호출을 차단할 플래그 설정
+                    UserDefaults.standard.set(true, forKey: "accountDeleted")
+                    
+                    // ContentView로 돌아가기
+                    UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                }
+            } else {
+                print("Failed to delete account. Status code: \(httpResponse.statusCode)")
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Response Body: \(responseString)")
+                }
+            }
+        }.resume()
+    }
+
+
+
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         print("Authorization failed: \(error.localizedDescription)")
     }
@@ -292,16 +349,15 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 }
 
-// WKWebView를 SwiftUI에서 사용하는 Wrapper
 struct WebViewWrapper: UIViewRepresentable {
     let url: URL
-    var userInfo: [String: String] // 여기서 `let`을 `var`로 변경
+    var userInfo: [String: String]
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
         let contentController = webView.configuration.userContentController
-        contentController.add(context.coordinator, name: "logoutHandler") // 로그아웃 핸들러 추가
-        contentController.add(context.coordinator, name: "deleteAccountHandler")
+        contentController.add(context.coordinator, name: "logoutHandler")
+        contentController.add(context.coordinator, name: "deleteAccountHandler") // 회원탈퇴 핸들러 추가
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
         webView.load(URLRequest(url: url))
@@ -326,7 +382,6 @@ struct WebViewWrapper: UIViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: WebViewWrapper
-        var pendingUserInfo: String?
 
         init(_ parent: WebViewWrapper) {
             self.parent = parent
@@ -341,6 +396,7 @@ struct WebViewWrapper: UIViewRepresentable {
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
                     print("User requested account deletion")
+                    AppleSignInCoordinator.shared.handleDeleteAccount()
                 }
             }
         }
@@ -378,8 +434,6 @@ struct WebViewWrapper: UIViewRepresentable {
                 if httpResponse.statusCode == 200 {
                     print("Successfully logged out.")
                     DispatchQueue.main.async {
-                        // ContentView로 돌아가기 위해 웹뷰 닫기
-                        self.parent.userInfo = [:] // 사용자 정보 초기화
                         UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
                     }
                 } else {
@@ -396,4 +450,3 @@ struct WebViewWrapper: UIViewRepresentable {
 #Preview {
     ContentView()
 }
-
