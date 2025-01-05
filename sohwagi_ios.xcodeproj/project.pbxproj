@@ -19,6 +19,7 @@
 		D2939B1C2D1C25BF00A037AA /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1B2D1C25BF00A037AA /* FirebaseCore */; };
 		D2939B202D1C27BF00A037AA /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = D2939B1F2D1C27BF00A037AA /* FirebaseMessaging */; };
 		D2939B222D1C337800A037AA /* splash.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2939B212D1C337800A037AA /* splash.swift */; };
+		D2D600912D290D9400E5EAF1 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2D600902D290D9400E5EAF1 /* WebKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +54,7 @@
 		D2939B1D2D1C26C800A037AA /* sohwagi_ios.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = sohwagi_ios.entitlements; sourceTree = "<group>"; };
 		D2939B1E2D1C270C00A037AA /* sohwagi-ios-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "sohwagi-ios-Info.plist"; sourceTree = SOURCE_ROOT; };
 		D2939B212D1C337800A037AA /* splash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = splash.swift; sourceTree = "<group>"; };
+		D2D600902D290D9400E5EAF1 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +64,7 @@
 			files = (
 				D2939B202D1C27BF00A037AA /* FirebaseMessaging in Frameworks */,
 				D2939B1C2D1C25BF00A037AA /* FirebaseCore in Frameworks */,
+				D2D600912D290D9400E5EAF1 /* WebKit.framework in Frameworks */,
 				D2939B1A2D1C25BB00A037AA /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -147,6 +150,7 @@
 		D2939B182D1C25BB00A037AA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D2D600902D290D9400E5EAF1 /* WebKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

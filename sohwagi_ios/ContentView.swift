@@ -101,47 +101,121 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
             var userInfo: [String: String] = [:]
 
-            // authorizationCode와 identityToken 콘솔에 출력 추가
+            // Authorization Code
             if let authorizationCode = authorizationCode,
                let authCodeString = String(data: authorizationCode, encoding: .utf8) {
                 print("Authorization Code: \(authCodeString)")
                 userInfo["authorizationCode"] = authCodeString
+            } else {
+                print("Authorization Code not available.")
             }
 
-            if let identityToken = identityToken,
-               let tokenString = String(data: identityToken, encoding: .utf8) {
-                print("Identity Token: \(tokenString)")
-                userInfo["identityToken"] = tokenString
-            }
-
-            // 기존 사용자 정보 저장 로직
+            // Full Name
             if let givenName = fullName?.givenName, let familyName = fullName?.familyName {
                 let fullNameString = "\(givenName) \(familyName)"
+                print("Full Name: \(fullNameString)")
                 userInfo["fullName"] = fullNameString
-                UserDefaults.standard.set(fullNameString, forKey: "userFullName")
             } else {
-                userInfo["fullName"] = UserDefaults.standard.string(forKey: "userFullName") ?? "Name Not Available"
+                print("Full Name not available.")
+                userInfo["fullName"] = "Name Not Available"
             }
 
+            // Email
             if let email = email {
+                print("Email: \(email)")
                 userInfo["email"] = email
-                UserDefaults.standard.set(email, forKey: "userEmail")
             } else {
-                userInfo["email"] = UserDefaults.standard.string(forKey: "userEmail") ?? "Email Not Available"
+                print("Email not available.")
+                userInfo["email"] = "Email Not Available"
             }
 
+            // User Identifier
+            print("User Identifier: \(userIdentifier)")
             userInfo["userID"] = userIdentifier
 
-            print("User Info: \(userInfo)")
+            // 가져온 정보를 확인
+            print("Fetched User Info: \(userInfo)")
 
-            // FCM 토큰 가져오기 및 웹뷰 호출
-            fetchFCMToken { fcmToken in
-                userInfo["fcmToken"] = fcmToken
-                self.showWebViewCallback?(true, userInfo)
+            // API 호출
+            if let authCode = userInfo["authorizationCode"], let userName = userInfo["fullName"] {
+                print("Preparing to call API with:")
+                print("Authorization Code: \(authCode)")
+                print("User Name: \(userName)")
+
+                postToAppleLoginAPI(authorizationCode: authCode, userName: userName) { result in
+                    switch result {
+                    case .success(let tokens):
+                        print("Access Token: \(tokens["accessToken"] ?? "N/A")")
+                        print("Refresh Token: \(tokens["refreshToken"] ?? "N/A")")
+                        UserDefaults.standard.set(tokens["accessToken"], forKey: "accessToken")
+                        UserDefaults.standard.set(tokens["refreshToken"], forKey: "refreshToken")
+                    case .failure(let error):
+                        print("API Error: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                print("Required user information is missing. API call aborted.")
             }
+            
+            // FCM 토큰 가져오기 및 웹뷰 호출
+                        fetchFCMToken { fcmToken in
+                            userInfo["fcmToken"] = fcmToken
+                            self.showWebViewCallback?(true, userInfo)
+                        }
         }
     }
 
+
+    func postToAppleLoginAPI(authorizationCode: String, userName: String, completion: @escaping (Result<[String: String], Error>) -> Void) {
+        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/login/oauth/apple") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: String] = [
+            "authorizationCode": authorizationCode,
+            "userName": userName
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            // 요청 정보를 콘솔에 출력
+            print("Preparing to send request:")
+            print("Request URL: \(url)")
+            print("Request Body: \(body)")
+        } catch {
+            completion(.failure(error))
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let data = data else {
+                completion(.failure(NSError(domain: "No data", code: -1, userInfo: nil)))
+                return
+            }
+
+            // 서버 응답 디버깅
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Server Response: \(responseString)")
+            }
+
+            do {
+                if let jsonResponse = try JSONSerialization.jsonObject(with: data, options: []) as? [String: String] {
+                    completion(.success(jsonResponse))
+                } else {
+                    completion(.failure(NSError(domain: "Invalid response format", code: -1, userInfo: nil)))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
 
     func fetchFCMToken(completion: @escaping (String?) -> Void) {
         Messaging.messaging().token { token, error in
@@ -171,39 +245,26 @@ struct WebViewWrapper: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
-        
-        // 메시지 핸들러 추가
         let contentController = webView.configuration.userContentController
         contentController.add(context.coordinator, name: "logoutHandler")
-        contentController.add(context.coordinator, name: "deleteAccountHandler") // 회원탈퇴 핸들러 추가
-
+        contentController.add(context.coordinator, name: "deleteAccountHandler")
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
-
-        let request = URLRequest(url: url)
-        webView.load(request)
+        webView.load(URLRequest(url: url))
         return webView
     }
 
-
-
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        // JSON 데이터 준비
         guard let jsonData = try? JSONSerialization.data(withJSONObject: userInfo, options: []),
-              let jsonString = String(data: jsonData, encoding: .utf8) else {
-            print("Failed to serialize userInfo to JSON.")
-            return
+              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+
+        let script = """
+        if (typeof window.receiveUserInfo === 'function') {
+            window.receiveUserInfo(\(jsonString));
         }
-
-        // JSON 문자열 출력 (디버깅용)
-        print("Sending JSON to JavaScript: \(jsonString)")
-
-        // WebView가 로드된 후 JavaScript 실행
-        context.coordinator.pendingUserInfo = jsonString
-        context.coordinator.injectUserInfoIfNeeded(webView: uiView)
+        """
+        uiView.evaluateJavaScript(script, completionHandler: nil)
     }
-
-
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -217,55 +278,19 @@ struct WebViewWrapper: UIViewRepresentable {
             self.parent = parent
         }
 
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // WebView 로드 완료 시 사용자 정보 전달
-            injectUserInfoIfNeeded(webView: webView)
-        }
-
-        func injectUserInfoIfNeeded(webView: WKWebView) {
-            guard let userInfo = pendingUserInfo else {
-                print("No pending user info to send.")
-                return
-            }
-
-            // JavaScript 코드에서 JSON 객체 전달
-            let script = """
-            if (typeof window.receiveUserInfo === 'function') {
-                window.receiveUserInfo(\(userInfo));
-            } else {
-                console.error('receiveUserInfo function is not defined.');
-            }
-            """
-            print("Sending JSON to JavaScript:", userInfo) // 로그 추가
-            webView.evaluateJavaScript(script) { result, error in
-                if let error = error {
-                    print("JavaScript execution error: \(error.localizedDescription)")
-                } else {
-                    print("JavaScript executed successfully.")
-                }
-            }
-        }
-
-        // JavaScript -> Swift 메시지 처리
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "logoutHandler", let messageBody = message.body as? String {
-                print("JavaScript sent message: \(messageBody)")
                 if messageBody == "logout" {
                     print("User requested logout")
-                    // 로그아웃 처리 추가
                 }
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
-                print("JavaScript sent message: \(messageBody)")
                 if messageBody == "deleteAccount" {
                     print("User requested account deletion")
-                    // 회원탈퇴 처리 추가
                 }
             }
         }
     }
-
 }
-
 
 #Preview {
     ContentView()
