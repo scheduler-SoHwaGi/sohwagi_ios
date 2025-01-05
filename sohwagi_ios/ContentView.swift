@@ -149,6 +149,17 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                         print("Refresh Token: \(tokens["refreshToken"] ?? "N/A")")
                         UserDefaults.standard.set(tokens["accessToken"], forKey: "accessToken")
                         UserDefaults.standard.set(tokens["refreshToken"], forKey: "refreshToken")
+                        
+                        // FCM 토큰을 가져온 후 추가 API 호출
+                        self.fetchFCMToken { fcmToken in
+                            guard let fcmToken = fcmToken else {
+                                print("No FCM Token available.")
+                                return
+                            }
+                            self.postFCMTokenToServer(fcmToken: fcmToken,
+                                                      accessToken: tokens["accessToken"] ?? "",
+                                                      refreshToken: tokens["refreshToken"] ?? "")
+                        }
                     case .failure(let error):
                         print("API Error: \(error.localizedDescription)")
                     }
@@ -156,15 +167,8 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             } else {
                 print("Required user information is missing. API call aborted.")
             }
-            
-            // FCM 토큰 가져오기 및 웹뷰 호출
-                        fetchFCMToken { fcmToken in
-                            userInfo["fcmToken"] = fcmToken
-                            self.showWebViewCallback?(true, userInfo)
-                        }
         }
     }
-
 
     func postToAppleLoginAPI(authorizationCode: String, userName: String, completion: @escaping (Result<[String: String], Error>) -> Void) {
         guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/login/oauth/apple") else { return }
@@ -180,7 +184,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-            // 요청 정보를 콘솔에 출력
             print("Preparing to send request:")
             print("Request URL: \(url)")
             print("Request Body: \(body)")
@@ -200,7 +203,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 return
             }
 
-            // 서버 응답 디버깅
             if let responseString = String(data: data, encoding: .utf8) {
                 print("Server Response: \(responseString)")
             }
@@ -216,6 +218,58 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             }
         }.resume()
     }
+
+    func postFCMTokenToServer(fcmToken: String, accessToken: String, refreshToken: String) {
+        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/users/fcmTokens") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+        request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+        let body: [String: String] = [
+            "fcmToken": fcmToken
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+            print("Preparing to send FCM Token to server:")
+            print("Request URL: \(url)")
+            print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+            print("Request Body: \(body)")
+        } catch {
+            print("Failed to serialize FCM Token request body.")
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Failed to send FCM Token: \(error.localizedDescription)")
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Invalid response from server.")
+                return
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("Successfully sent FCM Token to server.")
+
+                // 웹뷰 열기
+                DispatchQueue.main.async {
+                    self.showWebViewCallback?(true, ["fcmToken": fcmToken]) // 웹뷰를 표시하며 필요한 정보를 전달
+                }
+            } else {
+                print("Failed to send FCM Token. Status code: \(httpResponse.statusCode)")
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Response Body: \(responseString)")
+                }
+            }
+        }.resume()
+    }
+
 
     func fetchFCMToken(completion: @escaping (String?) -> Void) {
         Messaging.messaging().token { token, error in
@@ -241,12 +295,12 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 // WKWebView를 SwiftUI에서 사용하는 Wrapper
 struct WebViewWrapper: UIViewRepresentable {
     let url: URL
-    let userInfo: [String: String]
+    var userInfo: [String: String] // 여기서 `let`을 `var`로 변경
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
         let contentController = webView.configuration.userContentController
-        contentController.add(context.coordinator, name: "logoutHandler")
+        contentController.add(context.coordinator, name: "logoutHandler") // 로그아웃 핸들러 추가
         contentController.add(context.coordinator, name: "deleteAccountHandler")
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
@@ -282,6 +336,7 @@ struct WebViewWrapper: UIViewRepresentable {
             if message.name == "logoutHandler", let messageBody = message.body as? String {
                 if messageBody == "logout" {
                     print("User requested logout")
+                    self.handleLogout()
                 }
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
@@ -289,9 +344,56 @@ struct WebViewWrapper: UIViewRepresentable {
                 }
             }
         }
+
+        func handleLogout() {
+            guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+                  let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+                print("Access or Refresh token not available.")
+                return
+            }
+
+            guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/users/logout") else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+            request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+            print("Preparing to send logout request:")
+            print("Request URL: \(url)")
+            print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Failed to log out: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("Invalid response from server.")
+                    return
+                }
+
+                if httpResponse.statusCode == 200 {
+                    print("Successfully logged out.")
+                    DispatchQueue.main.async {
+                        // ContentView로 돌아가기 위해 웹뷰 닫기
+                        self.parent.userInfo = [:] // 사용자 정보 초기화
+                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                    }
+                } else {
+                    print("Failed to log out. Status code: \(httpResponse.statusCode)")
+                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                        print("Response Body: \(responseString)")
+                    }
+                }
+            }.resume()
+        }
     }
 }
 
 #Preview {
     ContentView()
 }
+
