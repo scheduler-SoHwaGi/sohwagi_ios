@@ -115,18 +115,24 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 let fullNameString = "\(givenName) \(familyName)"
                 print("Full Name: \(fullNameString)")
                 userInfo["fullName"] = fullNameString
+                
+                // UserDefaults에 저장
+                UserDefaults.standard.set(fullNameString, forKey: "fullName")
             } else {
                 print("Full Name not available.")
-                userInfo["fullName"] = "Name Not Available"
+                userInfo["fullName"] = UserDefaults.standard.string(forKey: "fullName") ?? "Name Not Available"
             }
 
             // Email
             if let email = email {
                 print("Email: \(email)")
                 userInfo["email"] = email
+                
+                // UserDefaults에 저장
+                UserDefaults.standard.set(email, forKey: "email")
             } else {
                 print("Email not available.")
-                userInfo["email"] = "Email Not Available"
+                userInfo["email"] = UserDefaults.standard.string(forKey: "email") ?? "Email Not Available"
             }
 
             // User Identifier
@@ -172,7 +178,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 
     func postToAppleLoginAPI(authorizationCode: String, userName: String, completion: @escaping (Result<[String: String], Error>) -> Void) {
-        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/oauth/apple/login") else { return }
+        guard let url = URL(string: "https://sohwagi.site/oauth/apple/login") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -221,7 +227,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 
     func postFCMTokenToServer(fcmToken: String, accessToken: String, refreshToken: String) {
-        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/users/fcmTokens") else { return }
+        guard let url = URL(string: "https://sohwagi.site/users/fcmTokens") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -283,63 +289,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
         }
     }
 
-    func handleDeleteAccount() {
-        guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
-              let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
-            print("Access token or Refresh token not available.")
-            return
-        }
-
-        guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/oauth/apple/revoke") else { return }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
-        request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
-
-        print("Preparing to send delete account request:")
-        print("Request URL: \(url)")
-        print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Failed to delete account: \(error.localizedDescription)")
-                return
-            }
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("Invalid response from server.")
-                return
-            }
-
-            if httpResponse.statusCode == 200 {
-                print("Successfully deleted account.")
-                
-                // 상태 초기화
-                DispatchQueue.main.async {
-                    // UserDefaults 초기화
-                    UserDefaults.standard.removeObject(forKey: "accessToken")
-                    UserDefaults.standard.removeObject(forKey: "refreshToken")
-                    UserDefaults.standard.removeObject(forKey: "authorizationCode")
-                    
-                    // 다른 API 호출을 차단할 플래그 설정
-                    UserDefaults.standard.set(true, forKey: "accountDeleted")
-                    
-                    // ContentView로 돌아가기
-                    UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
-                }
-            } else {
-                print("Failed to delete account. Status code: \(httpResponse.statusCode)")
-                if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                    print("Response Body: \(responseString)")
-                }
-            }
-        }.resume()
-    }
-
-
-
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         print("Authorization failed: \(error.localizedDescription)")
     }
@@ -396,7 +345,6 @@ struct WebViewWrapper: UIViewRepresentable {
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
                     print("User requested account deletion")
-                    AppleSignInCoordinator.shared.handleDeleteAccount()
                 }
             }
         }
@@ -408,7 +356,7 @@ struct WebViewWrapper: UIViewRepresentable {
                 return
             }
 
-            guard let url = URL(string: "https://9b79-122-36-149-213.ngrok-free.app/users/logout") else { return }
+            guard let url = URL(string: "https://sohwagi.site/users/logout") else { return }
 
             var request = URLRequest(url: url)
             request.httpMethod = "PATCH"
