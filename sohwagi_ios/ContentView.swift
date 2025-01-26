@@ -115,7 +115,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 let fullNameString = "\(givenName) \(familyName)"
                 print("Full Name: \(fullNameString)")
                 userInfo["fullName"] = fullNameString
-                
+
                 // UserDefaults에 저장
                 UserDefaults.standard.set(fullNameString, forKey: "fullName")
             } else {
@@ -127,7 +127,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             if let email = email {
                 print("Email: \(email)")
                 userInfo["email"] = email
-                
+
                 // UserDefaults에 저장
                 UserDefaults.standard.set(email, forKey: "email")
             } else {
@@ -156,6 +156,8 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                         UserDefaults.standard.set(tokens["accessToken"], forKey: "accessToken")
                         UserDefaults.standard.set(tokens["refreshToken"], forKey: "refreshToken")
                         UserDefaults.standard.set(userInfo["authorizationCode"], forKey: "authorizationCode")
+                        
+                       
 
                         // FCM 토큰을 가져온 후 추가 API 호출
                         self.fetchFCMToken { fcmToken in
@@ -166,6 +168,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                             self.postFCMTokenToServer(fcmToken: fcmToken,
                                                       accessToken: tokens["accessToken"] ?? "",
                                                       refreshToken: tokens["refreshToken"] ?? "")
+                            
                         }
                     case .failure(let error):
                         print("API Error: \(error.localizedDescription)")
@@ -191,9 +194,6 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-            print("Preparing to send request:")
-            print("Request URL: \(url)")
-            print("Request Body: \(body)")
         } catch {
             completion(.failure(error))
             return
@@ -210,13 +210,22 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
                 return
             }
 
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Server Response: \(responseString)")
-            }
-
             do {
                 if let jsonResponse = try JSONSerialization.jsonObject(with: data, options: []) as? [String: String] {
-                    completion(.success(jsonResponse))
+                    // 서버 응답(JSON)에서 토큰 추출
+                    if let accessToken = jsonResponse["accessToken"], let refreshToken = jsonResponse["refreshToken"] {
+                        // UserDefaults에 저장
+                        UserDefaults.standard.set(accessToken, forKey: "accessToken")
+                        UserDefaults.standard.set(refreshToken, forKey: "refreshToken")
+                        
+                        // 토큰을 콜백으로 반환
+                        completion(.success([
+                            "accessToken": accessToken,
+                            "refreshToken": refreshToken
+                        ]))
+                    } else {
+                        completion(.failure(NSError(domain: "Tokens not found in response", code: -1, userInfo: nil)))
+                    }
                 } else {
                     completion(.failure(NSError(domain: "Invalid response format", code: -1, userInfo: nil)))
                 }
@@ -225,6 +234,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             }
         }.resume()
     }
+
 
     func postFCMTokenToServer(fcmToken: String, accessToken: String, refreshToken: String) {
         guard let url = URL(string: "https://sohwagi.site/users/fcmTokens") else { return }
@@ -289,6 +299,63 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
         }
     }
 
+    func handleDeleteAccount() {
+        guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+              let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+            print("Access token or Refresh token not available.")
+            return
+        }
+
+        guard let url = URL(string: "https://sohwagi.site/oauth/apple/revoke") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+        request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+        print("Preparing to send delete account request:")
+        print("Request URL: \(url)")
+        print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Failed to delete account: \(error.localizedDescription)")
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("Invalid response from server.")
+                return
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("Successfully deleted account.")
+                
+                // 상태 초기화
+                DispatchQueue.main.async {
+                    // UserDefaults 초기화
+                    UserDefaults.standard.removeObject(forKey: "accessToken")
+                    UserDefaults.standard.removeObject(forKey: "refreshToken")
+                    UserDefaults.standard.removeObject(forKey: "authorizationCode")
+                    
+                    // 다른 API 호출을 차단할 플래그 설정
+                    UserDefaults.standard.set(true, forKey: "accountDeleted")
+                    
+                    // ContentView로 돌아가기
+                    UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                }
+            } else {
+                print("Failed to delete account. Status code: \(httpResponse.statusCode)")
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Response Body: \(responseString)")
+                }
+            }
+        }.resume()
+    }
+
+
+
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         print("Authorization failed: \(error.localizedDescription)")
     }
@@ -304,6 +371,7 @@ struct WebViewWrapper: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        webView.configuration.preferences.javaScriptEnabled = true
         let contentController = webView.configuration.userContentController
         contentController.add(context.coordinator, name: "logoutHandler")
         contentController.add(context.coordinator, name: "deleteAccountHandler") // 회원탈퇴 핸들러 추가
@@ -314,12 +382,15 @@ struct WebViewWrapper: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: userInfo, options: []),
-              let jsonString = String(data: jsonData, encoding: .utf8) else { return }
+        guard
+            let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+            let refreshToken = UserDefaults.standard.string(forKey: "refreshToken"),
+            let jsonData = try? JSONSerialization.data(withJSONObject: ["accessToken": accessToken, "refreshToken": refreshToken], options: []),
+            let jsonString = String(data: jsonData, encoding: .utf8) else { return }
 
         let script = """
-        if (typeof window.receiveUserInfo === 'function') {
-            window.receiveUserInfo(\(jsonString));
+        if (typeof window.receiveTokens === 'function') {
+            window.receiveTokens(\(jsonString));
         }
         """
         uiView.evaluateJavaScript(script, completionHandler: nil)
@@ -345,6 +416,7 @@ struct WebViewWrapper: UIViewRepresentable {
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
                     print("User requested account deletion")
+                    AppleSignInCoordinator.shared.handleDeleteAccount()
                 }
             }
         }
