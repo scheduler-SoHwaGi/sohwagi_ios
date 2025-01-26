@@ -373,27 +373,25 @@ struct WebViewWrapper: UIViewRepresentable {
         let webView = WKWebView()
         webView.configuration.preferences.javaScriptEnabled = true
         let contentController = webView.configuration.userContentController
+
+        // JavaScript 메시지 핸들러 추가
+        contentController.add(context.coordinator, name: "webViewReady")
         contentController.add(context.coordinator, name: "logoutHandler")
-        contentController.add(context.coordinator, name: "deleteAccountHandler") // 회원탈퇴 핸들러 추가
+        contentController.add(context.coordinator, name: "deleteAccountHandler")
+
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
         webView.load(URLRequest(url: url))
+
+        // Coordinator에 WebView 참조 전달
+        context.coordinator.webView = webView
+
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        guard
-            let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
-            let refreshToken = UserDefaults.standard.string(forKey: "refreshToken"),
-            let jsonData = try? JSONSerialization.data(withJSONObject: ["accessToken": accessToken, "refreshToken": refreshToken], options: []),
-            let jsonString = String(data: jsonData, encoding: .utf8) else { return }
-
-        let script = """
-        if (typeof window.receiveTokens === 'function') {
-            window.receiveTokens(\(jsonString));
-        }
-        """
-        uiView.evaluateJavaScript(script, completionHandler: nil)
+        // updateUIView에서는 아무 작업도 하지 않습니다.
+        // 토큰 전달은 웹뷰가 준비되었음을 확인한 뒤 Coordinator에서 수행됩니다.
     }
 
     func makeCoordinator() -> Coordinator {
@@ -402,16 +400,24 @@ struct WebViewWrapper: UIViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: WebViewWrapper
+        var isWebViewReady = false // 웹뷰 준비 상태 플래그
+        weak var webView: WKWebView? // WebView 참조
 
         init(_ parent: WebViewWrapper) {
             self.parent = parent
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            if message.name == "logoutHandler", let messageBody = message.body as? String {
+            if message.name == "webViewReady" {
+                print("WebView is ready to receive data.")
+                isWebViewReady = true
+
+                // 토큰 전달
+                sendTokensToWebView()
+            } else if message.name == "logoutHandler", let messageBody = message.body as? String {
                 if messageBody == "logout" {
                     print("User requested logout")
-                    self.handleLogout()
+                    handleLogout()
                 }
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
@@ -420,6 +426,95 @@ struct WebViewWrapper: UIViewRepresentable {
                 }
             }
         }
+
+        func sendTokensToWebView() {
+            guard isWebViewReady, let webView = webView else {
+                print("WebView is not ready or unavailable.")
+                return
+            }
+
+            guard
+                let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+                let refreshToken = UserDefaults.standard.string(forKey: "refreshToken"),
+                let jsonData = try? JSONSerialization.data(withJSONObject: ["accessToken": accessToken, "refreshToken": refreshToken], options: []),
+                let jsonString = String(data: jsonData, encoding: .utf8) else {
+                print("Failed to prepare token JSON.")
+                return
+            }
+
+            let script = """
+            if (typeof window.receiveUserInfo === 'function') {
+                window.receiveUserInfo(\(jsonString));
+            }
+            """
+
+            // JavaScript 실행 및 결과 확인
+            webView.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    print("Error sending tokens to WebView: \(error.localizedDescription)")
+                } else {
+                    print("Tokens successfully sent to WebView.")
+                    if let result = result {
+                        print("JavaScript evaluation result: \(result)")
+                    } else {
+                        print("No result returned from JavaScript evaluation.")
+                    }
+                }
+            }
+        }
+        
+        func handleDeleteAccount() {
+            guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+                  let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+                print("Access token or Refresh token not available.")
+                return
+            }
+
+            guard let url = URL(string: "https://sohwagi.site/oauth/apple/revoke") else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "DELETE"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+            request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+            print("Preparing to send delete account request:")
+            print("Request URL: \(url)")
+            print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Failed to delete account: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("Invalid response from server.")
+                    return
+                }
+
+                if httpResponse.statusCode == 200 {
+                    print("Successfully deleted account.")
+
+                    // 상태 초기화
+                    DispatchQueue.main.async {
+                        // UserDefaults 초기화
+                        UserDefaults.standard.removeObject(forKey: "accessToken")
+                        UserDefaults.standard.removeObject(forKey: "refreshToken")
+                        UserDefaults.standard.removeObject(forKey: "authorizationCode")
+
+                        // ContentView로 돌아가기
+                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                    }
+                } else {
+                    print("Failed to delete account. Status code: \(httpResponse.statusCode)")
+                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                        print("Response Body: \(responseString)")
+                    }
+                }
+            }.resume()
+        }
+
 
         func handleLogout() {
             guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
@@ -466,6 +561,7 @@ struct WebViewWrapper: UIViewRepresentable {
         }
     }
 }
+
 
 #Preview {
     ContentView()
