@@ -26,8 +26,23 @@ struct ContentView: View {
                 LoginView(showWebView: $showWebView, userInfo: $userInfo) // 스플래시 이후 로그인 화면
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloseWebView"))) { _ in
+                    showWebView = false
+                }
     }
+    
     private func attemptAutoLogin() {
+        let isLoggedOut = UserDefaults.standard.bool(forKey: "isLoggedOut")
+
+        // 로그아웃 or 회원탈퇴된 경우 자동 로그인 강력 차단
+        if isLoggedOut {
+            print("자동 로그인 차단됨: 로그아웃 또는 회원탈퇴 상태")
+            
+            //userID 삭제 여부 확인 (디버깅용)
+            print("Saved userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
+            return
+        }
+
         if let userID = UserDefaults.standard.string(forKey: "userID") {
             print("저장된 userID 확인됨: \(userID), 자동 로그인 시도")
             AppleSignInCoordinator.shared.performAutoLogin(userID: userID) { success, fetchedUserInfo in
@@ -45,7 +60,6 @@ struct ContentView: View {
             print("자동 로그인을 위한 userID가 저장되지 않음. 로그인 필요")
         }
     }
-
 
 }
 
@@ -104,21 +118,34 @@ struct LoginView: View {
     }
 
     private func performAppleSignIn() {
-            let request = ASAuthorizationAppleIDProvider().createRequest()
-            request.requestedScopes = [.fullName, .email]
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
 
-            let controller = ASAuthorizationController(authorizationRequests: [request])
-            controller.delegate = AppleSignInCoordinator.shared
-            AppleSignInCoordinator.shared.showWebViewCallback = { show, userInfo in
-                DispatchQueue.main.async {
-                    print("showWebViewCallback 실행됨 → 웹뷰 열기")
-                    self.userInfo = userInfo
-                    self.showWebView = show
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = AppleSignInCoordinator.shared
+
+        // 🔍 showWebViewCallback 정의 위치
+        AppleSignInCoordinator.shared.showWebViewCallback = { show, userInfo in
+            DispatchQueue.main.async {
+                let isLoggedOut = UserDefaults.standard.bool(forKey: "isLoggedOut")
+                if isLoggedOut {
+                    print("자동 로그인 차단 상태 → 웹뷰 열지 않음")
+                    return
                 }
+
+                print("showWebViewCallback 실행됨 → 웹뷰 열기")
+                self.userInfo = userInfo
+                self.showWebView = show
             }
-            controller.presentationContextProvider = AppleSignInCoordinator.shared
-            controller.performRequests()
         }
+
+
+
+        controller.presentationContextProvider = AppleSignInCoordinator.shared
+        controller.performRequests()
+    }
+
+
 }
 
 // 애플 로그인 코디네이터
@@ -161,6 +188,9 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             let identityToken = appleIDCredential.identityToken
 
             var userInfo: [String: String] = [:]
+            
+            // 로그인 성공 시 자동 로그인 차단 해제 
+                    UserDefaults.standard.set(false, forKey: "isLoggedOut")
             
             // user id 저장
             UserDefaults.standard.set(userIdentifier, forKey: "userID")
@@ -395,28 +425,36 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
             if httpResponse.statusCode == 200 {
                 print("Successfully deleted account.")
-                
-                // 상태 초기화
+
                 DispatchQueue.main.async {
-                    // UserDefaults 초기화
+                    // 자동 로그인 차단 (isLoggedOut 설정)
+                    UserDefaults.standard.set(true, forKey: "isLoggedOut")
+
+                    // 모든 사용자 데이터 삭제
+                    UserDefaults.standard.removeObject(forKey: "userID")
                     UserDefaults.standard.removeObject(forKey: "accessToken")
                     UserDefaults.standard.removeObject(forKey: "refreshToken")
                     UserDefaults.standard.removeObject(forKey: "authorizationCode")
-                    
-                    // 다른 API 호출을 차단할 플래그 설정
-                    UserDefaults.standard.set(true, forKey: "accountDeleted")
-                    
-                    // ContentView로 돌아가기
-                    UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+
+                    // 즉시 반영 (반드시 필요!)
+                    UserDefaults.standard.synchronize()
+
+                    // 삭제된 값 확인 (디버깅 로그)
+                    print("UserDefaults after deletion:")
+                    print("userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
+                    print("isLoggedOut: \(UserDefaults.standard.bool(forKey: "isLoggedOut"))")
+
+                    // 자동 로그인이 실행되지 않도록 `attemptAutoLogin()` 실행 전에 약간의 지연 추가
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                    }
                 }
             } else {
                 print("Failed to delete account. Status code: \(httpResponse.statusCode)")
-                if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                    print("Response Body: \(responseString)")
-                }
             }
         }.resume()
     }
+
 
 
 
@@ -560,24 +598,33 @@ struct WebViewWrapper: UIViewRepresentable {
                 if httpResponse.statusCode == 200 {
                     print("Successfully deleted account.")
 
-                    // 상태 초기화
                     DispatchQueue.main.async {
-                        // UserDefaults 초기화
+                        // 자동 로그인 차단
+                        UserDefaults.standard.set(true, forKey: "isLoggedOut")
+
+                        // 모든 사용자 데이터 삭제
+                        UserDefaults.standard.removeObject(forKey: "userID")
                         UserDefaults.standard.removeObject(forKey: "accessToken")
                         UserDefaults.standard.removeObject(forKey: "refreshToken")
                         UserDefaults.standard.removeObject(forKey: "authorizationCode")
 
-                        // ContentView로 돌아가기
-                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                        // 즉시 반영
+                        UserDefaults.standard.synchronize()
+
+                        // 로그 확인 (삭제된 값 출력)
+                        print("UserDefaults after deletion:")
+                        print("userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
+                        print("isLoggedOut: \(UserDefaults.standard.bool(forKey: "isLoggedOut"))")
+
+                        
                     }
                 } else {
                     print("Failed to delete account. Status code: \(httpResponse.statusCode)")
-                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                        print("Response Body: \(responseString)")
-                    }
                 }
             }.resume()
         }
+
+
 
 
         func handleLogout() {
@@ -612,17 +659,32 @@ struct WebViewWrapper: UIViewRepresentable {
 
                 if httpResponse.statusCode == 200 {
                     print("Successfully logged out.")
+
+                    //로그아웃 후 자동 로그인 차단을 위해 데이터 삭제
                     DispatchQueue.main.async {
+                        // 자동 로그인 차단을 위해 isLoggedOut 플래그 설정
+                        UserDefaults.standard.set(true, forKey: "isLoggedOut")
+
+                        // 모든 사용자 정보 삭제
+                        UserDefaults.standard.removeObject(forKey: "userID")
+                        UserDefaults.standard.removeObject(forKey: "accessToken")
+                        UserDefaults.standard.removeObject(forKey: "refreshToken")
+                        UserDefaults.standard.removeObject(forKey: "authorizationCode")
+                        
+                        
+                        // 즉시 동기화
+                        UserDefaults.standard.synchronize()
+
+                        // ContentView로 돌아가기 (자동 로그인 차단 상태)
                         UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
                     }
+
                 } else {
                     print("Failed to log out. Status code: \(httpResponse.statusCode)")
-                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                        print("Response Body: \(responseString)")
-                    }
                 }
             }.resume()
         }
+
     }
 }
 
