@@ -5,6 +5,9 @@ import WebKit
 
 struct ContentView: View {
     @State private var showSplash = true // 스플래시 화면 표시 여부
+    @State private var showWebView = false // 자동 로그인 성공 시 웹뷰로 이동
+        @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
+    
 
     var body: some View {
         ZStack {
@@ -19,15 +22,17 @@ struct ContentView: View {
                         }
                     }
             } else {
-                LoginView() // 스플래시 이후 로그인 화면
+                LoginView(showWebView: $showWebView, userInfo: $userInfo) // 스플래시 이후 로그인 화면
             }
         }
     }
 }
 
+
+
 struct LoginView: View {
-    @State private var showWebView = false // 웹뷰 표시 여부
-    @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
+    @Binding var showWebView: Bool // ContentView에서 전달받은 바인딩 변수
+    @Binding var userInfo: [String: String] // 사용자 정보 바인딩
 
     var body: some View {
         ZStack {
