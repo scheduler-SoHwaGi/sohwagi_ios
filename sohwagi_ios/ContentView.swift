@@ -6,7 +6,8 @@ import WebKit
 struct ContentView: View {
     @State private var showSplash = true // 스플래시 화면 표시 여부
     @State private var showWebView = false // 자동 로그인 성공 시 웹뷰로 이동
-        @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
+    @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
+    @State private var isCheckingLogin = true // 로그인 확인 중인지 여부
     
 
     var body: some View {
@@ -23,7 +24,15 @@ struct ContentView: View {
                         }
                     }
             } else {
-                LoginView(showWebView: $showWebView, userInfo: $userInfo) // 스플래시 이후 로그인 화면
+                if isCheckingLogin {
+                                    //로그인 상태 확인 중이면 아무것도 표시하지 않음 (UI 깜빡임 방지)
+                                    Color.clear.ignoresSafeArea()
+                                } else if showWebView {
+                                    WebViewWrapper(url: URL(string: "https://sohawgi-front.vercel.app/")!, userInfo: userInfo)
+                                        .edgesIgnoringSafeArea(.all)
+                                } else {
+                                    LoginView(showWebView: $showWebView, userInfo: $userInfo)
+                                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloseWebView"))) { _ in
@@ -37,6 +46,7 @@ struct ContentView: View {
         // 로그아웃 or 회원탈퇴된 경우 자동 로그인 강력 차단
         if isLoggedOut {
             print("자동 로그인 차단됨: 로그아웃 또는 회원탈퇴 상태")
+            isCheckingLogin = false
             
             //userID 삭제 여부 확인 (디버깅용)
             print("Saved userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
@@ -54,10 +64,12 @@ struct ContentView: View {
                     } else {
                         print("자동 로그인 실패")
                     }
+                    self.isCheckingLogin = false
                 }
             }
         } else {
             print("자동 로그인을 위한 userID가 저장되지 않음. 로그인 필요")
+            isCheckingLogin = false 
         }
     }
 
