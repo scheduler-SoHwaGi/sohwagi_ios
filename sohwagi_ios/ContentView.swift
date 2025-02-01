@@ -19,6 +19,7 @@ struct ContentView: View {
                             withAnimation {
                                 showSplash = false
                             }
+                            attemptAutoLogin()
                         }
                     }
             } else {
@@ -26,6 +27,26 @@ struct ContentView: View {
             }
         }
     }
+    private func attemptAutoLogin() {
+        if let userID = UserDefaults.standard.string(forKey: "userID") {
+            print("저장된 userID 확인됨: \(userID), 자동 로그인 시도")
+            AppleSignInCoordinator.shared.performAutoLogin(userID: userID) { success, fetchedUserInfo in
+                DispatchQueue.main.async {
+                    if success {
+                        print("자동 로그인 성공 → 웹뷰 열기")
+                        self.userInfo = fetchedUserInfo
+                        self.showWebView = true
+                    } else {
+                        print("자동 로그인 실패")
+                    }
+                }
+            }
+        } else {
+            print("자동 로그인을 위한 userID가 저장되지 않음. 로그인 필요")
+        }
+    }
+
+
 }
 
 
@@ -74,28 +95,63 @@ struct LoginView: View {
                     .edgesIgnoringSafeArea(.all)
             }
         }
+        .onAppear {
+                    print("LoginView appeared. showWebView: \(showWebView)")
+                }
+                .onChange(of: showWebView) { newValue in
+                    print("showWebView 값 변경됨: \(newValue)")
+                }
     }
 
     private func performAppleSignIn() {
-        let request = ASAuthorizationAppleIDProvider().createRequest()
-        request.requestedScopes = [.fullName, .email]
+            let request = ASAuthorizationAppleIDProvider().createRequest()
+            request.requestedScopes = [.fullName, .email]
 
-        let controller = ASAuthorizationController(authorizationRequests: [request])
-        controller.delegate = AppleSignInCoordinator.shared
-        AppleSignInCoordinator.shared.showWebViewCallback = { show, userInfo in
-            self.userInfo = userInfo
-            self.showWebView = show // 웹뷰 표시 여부 업데이트
+            let controller = ASAuthorizationController(authorizationRequests: [request])
+            controller.delegate = AppleSignInCoordinator.shared
+            AppleSignInCoordinator.shared.showWebViewCallback = { show, userInfo in
+                DispatchQueue.main.async {
+                    print("showWebViewCallback 실행됨 → 웹뷰 열기")
+                    self.userInfo = userInfo
+                    self.showWebView = show
+                }
+            }
+            controller.presentationContextProvider = AppleSignInCoordinator.shared
+            controller.performRequests()
         }
-        controller.presentationContextProvider = AppleSignInCoordinator.shared
-        controller.performRequests()
-    }
 }
 
 // 애플 로그인 코디네이터
 class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     static let shared = AppleSignInCoordinator()
     var showWebViewCallback: ((Bool, [String: String]) -> Void)?
+    
+    // 자동 로그인 수행
+    func performAutoLogin(userID: String, completion: @escaping (Bool, [String: String]) -> Void) {
+        let appleIDProvider = ASAuthorizationAppleIDProvider()
+        appleIDProvider.getCredentialState(forUserID: userID) { credentialState, error in
+            DispatchQueue.main.async {
+                if credentialState == .authorized {
+                    print("자동 로그인 성공: \(userID)")
 
+                    var userInfo: [String: String] = [:]
+                    userInfo["userID"] = userID
+                    userInfo["fullName"] = UserDefaults.standard.string(forKey: "fullName") ?? "Unknown"
+                    userInfo["email"] = UserDefaults.standard.string(forKey: "email") ?? "Unknown"
+
+                    // UI 업데이트
+                    self.showWebViewCallback?(true, userInfo)  // 웹뷰 표시
+                    completion(true, userInfo)
+                } else {
+                    print("자동 로그인 실패")
+                    completion(false, [:])
+                }
+            }
+        }
+    }
+
+    
+    // 일반 로그인 수행
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             let userIdentifier = appleIDCredential.user
@@ -105,6 +161,9 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
             let identityToken = appleIDCredential.identityToken
 
             var userInfo: [String: String] = [:]
+            
+            // user id 저장
+            UserDefaults.standard.set(userIdentifier, forKey: "userID")
 
             // Authorization Code
             if let authorizationCode = authorizationCode,
