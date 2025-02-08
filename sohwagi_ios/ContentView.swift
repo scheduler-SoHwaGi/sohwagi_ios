@@ -11,7 +11,10 @@ struct ContentView: View {
     
 
     var body: some View {
+        
         ZStack {
+        
+            
             if showSplash {
                 LaunchView() // SplashView 호출
                     .onAppear {
@@ -483,8 +486,12 @@ struct WebViewWrapper: UIViewRepresentable {
     let url: URL
     var userInfo: [String: String]
 
+
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
+        
+        webView.backgroundColor = .white
+        webView.isOpaque = false // 불투명 제거
         webView.configuration.preferences.javaScriptEnabled = true
         let contentController = webView.configuration.userContentController
 
