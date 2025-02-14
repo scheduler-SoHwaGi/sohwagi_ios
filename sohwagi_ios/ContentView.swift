@@ -2,23 +2,38 @@ import SwiftUI
 import AuthenticationServices
 import FirebaseMessaging
 import WebKit
+import UIKit
+
+struct HomeIndicatorBackgroundView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .white
+        
+        // ✅ 홈 인디케이터 높이에 맞춰 배경 설정
+        if let window = UIApplication.shared.windows.first {
+            let bottomPadding = window.safeAreaInsets.bottom
+            view.frame = CGRect(x: 0, y: UIScreen.main.bounds.height - bottomPadding, width: UIScreen.main.bounds.width, height: bottomPadding)
+        }
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        uiView.backgroundColor = .white
+    }
+}
 
 struct ContentView: View {
     @State private var showSplash = true // 스플래시 화면 표시 여부
     @State private var showWebView = false // 자동 로그인 성공 시 웹뷰로 이동
     @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
     @State private var isCheckingLogin = true // 로그인 확인 중인지 여부
-    
 
     var body: some View {
-        
         ZStack {
-        
-            
             if showSplash {
-                LaunchView() // SplashView 호출
+                LaunchView()
                     .onAppear {
-                        // 1초 후 스플래시 화면 종료
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                             withAnimation {
                                 showSplash = false
@@ -28,30 +43,36 @@ struct ContentView: View {
                     }
             } else {
                 if isCheckingLogin {
-                                    //로그인 상태 확인 중이면 아무것도 표시하지 않음 (UI 깜빡임 방지)
-                                    Color.clear.ignoresSafeArea()
-                                } else if showWebView {
-                                    WebViewWrapper(url: URL(string: "https://sohawgi-front.vercel.app/")!, userInfo: userInfo)
-                                        .edgesIgnoringSafeArea(.all)
-                                } else {
-                                    LoginView(showWebView: $showWebView, userInfo: $userInfo)
-                                }
+                    Color.clear.ignoresSafeArea()
+                } else if showWebView {
+                    ZStack {
+                        WebViewWrapper(url: URL(string: "https://sohawgi-front.vercel.app/")!, userInfo: userInfo)
+                            .edgesIgnoringSafeArea(.all)
+
+                        // ✅ 홈 인디케이터 배경을 가장 아래에 배치하여 실제 홈 인디케이터 배경으로 사용
+                        VStack {
+                            Spacer()
+                            HomeIndicatorBackgroundView()
+                                .frame(height: UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 34)
+                                .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height - ((UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 34) / 2))
+                        }
+                    }
+                } else {
+                    LoginView(showWebView: $showWebView, userInfo: $userInfo)
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("CloseWebView"))) { _ in
-                    showWebView = false
-                }
+            showWebView = false
+        }
     }
-    
+
     private func attemptAutoLogin() {
         let isLoggedOut = UserDefaults.standard.bool(forKey: "isLoggedOut")
 
-        // 로그아웃 or 회원탈퇴된 경우 자동 로그인 강력 차단
         if isLoggedOut {
             print("자동 로그인 차단됨: 로그아웃 또는 회원탈퇴 상태")
             isCheckingLogin = false
-            
-            //userID 삭제 여부 확인 (디버깅용)
             print("Saved userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
             return
         }
@@ -72,12 +93,10 @@ struct ContentView: View {
             }
         } else {
             print("자동 로그인을 위한 userID가 저장되지 않음. 로그인 필요")
-            isCheckingLogin = false 
+            isCheckingLogin = false
         }
     }
-
 }
-
 
 
 struct LoginView: View {
@@ -204,7 +223,7 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
 
             var userInfo: [String: String] = [:]
             
-            // 로그인 성공 시 자동 로그인 차단 해제 
+            // 로그인 성공 시 자동 로그인 차단 해제
                     UserDefaults.standard.set(false, forKey: "isLoggedOut")
             
             // user id 저장
@@ -486,12 +505,12 @@ struct WebViewWrapper: UIViewRepresentable {
     let url: URL
     var userInfo: [String: String]
 
-
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()
         
-        webView.backgroundColor = .white
-        webView.isOpaque = false // 불투명 제거
+        // ✅ Safe Area에 의해 자동 조정되지 않도록 설정
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        
         webView.configuration.preferences.javaScriptEnabled = true
         let contentController = webView.configuration.userContentController
 
@@ -510,10 +529,7 @@ struct WebViewWrapper: UIViewRepresentable {
         return webView
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        // updateUIView에서는 아무 작업도 하지 않습니다.
-        // 토큰 전달은 웹뷰가 준비되었음을 확인한 뒤 Coordinator에서 수행됩니다.
-    }
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -532,8 +548,6 @@ struct WebViewWrapper: UIViewRepresentable {
             if message.name == "webViewReady" {
                 print("WebView is ready to receive data.")
                 isWebViewReady = true
-
-                // 토큰 전달
                 sendTokensToWebView()
             } else if message.name == "logoutHandler", let messageBody = message.body as? String {
                 if messageBody == "logout" {
@@ -543,7 +557,7 @@ struct WebViewWrapper: UIViewRepresentable {
             } else if message.name == "deleteAccountHandler", let messageBody = message.body as? String {
                 if messageBody == "deleteAccount" {
                     print("User requested account deletion")
-                    AppleSignInCoordinator.shared.handleDeleteAccount()
+                    handleDeleteAccount()
                 }
             }
         }
@@ -569,7 +583,6 @@ struct WebViewWrapper: UIViewRepresentable {
             }
             """
 
-            // JavaScript 실행 및 결과 확인
             webView.evaluateJavaScript(script) { result, error in
                 if let error = error {
                     print("Error sending tokens to WebView: \(error.localizedDescription)")
@@ -584,6 +597,62 @@ struct WebViewWrapper: UIViewRepresentable {
             }
         }
         
+        func handleLogout() {
+            guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
+                  let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
+                print("Access token or Refresh token not available.")
+                return
+            }
+
+            guard let url = URL(string: "https://sohwagi.site/users/logout") else { return }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
+            request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
+
+            print("Preparing to send logout request:")
+            print("Request URL: \(url)")
+            print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
+
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Failed to log out: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("Invalid response from server.")
+                    return
+                }
+
+                if httpResponse.statusCode == 200 {
+                    print("Successfully logged out.")
+
+                    DispatchQueue.main.async {
+                        // 자동 로그인 차단
+                        UserDefaults.standard.set(true, forKey: "isLoggedOut")
+
+                        // 모든 사용자 데이터 삭제
+                        UserDefaults.standard.removeObject(forKey: "userID")
+                        UserDefaults.standard.removeObject(forKey: "accessToken")
+                        UserDefaults.standard.removeObject(forKey: "refreshToken")
+                        UserDefaults.standard.removeObject(forKey: "authorizationCode")
+
+                        // 즉시 반영
+                        UserDefaults.standard.synchronize()
+
+                        // ContentView로 돌아가기
+                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+                    }
+
+                } else {
+                    print("Failed to log out. Status code: \(httpResponse.statusCode)")
+                }
+            }.resume()
+        }
+
         func handleDeleteAccount() {
             guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
                   let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
@@ -630,82 +699,17 @@ struct WebViewWrapper: UIViewRepresentable {
                         // 즉시 반영
                         UserDefaults.standard.synchronize()
 
-                        // 로그 확인 (삭제된 값 출력)
-                        print("UserDefaults after deletion:")
-                        print("userID: \(UserDefaults.standard.string(forKey: "userID") ?? "nil")")
-                        print("isLoggedOut: \(UserDefaults.standard.bool(forKey: "isLoggedOut"))")
-
-                        
+                        // ContentView로 돌아가기
+                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
                     }
                 } else {
                     print("Failed to delete account. Status code: \(httpResponse.statusCode)")
                 }
             }.resume()
         }
-
-
-
-
-        func handleLogout() {
-            guard let accessToken = UserDefaults.standard.string(forKey: "accessToken"),
-                  let refreshToken = UserDefaults.standard.string(forKey: "refreshToken") else {
-                print("Access or Refresh token not available.")
-                return
-            }
-
-            guard let url = URL(string: "https://sohwagi.site/users/logout") else { return }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "PATCH"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue(accessToken, forHTTPHeaderField: "X-ACCESS-TOKEN")
-            request.setValue(refreshToken, forHTTPHeaderField: "X-REFRESH-TOKEN")
-
-            print("Preparing to send logout request:")
-            print("Request URL: \(url)")
-            print("Request Headers: [X-ACCESS-TOKEN: \(accessToken), X-REFRESH-TOKEN: \(refreshToken)]")
-
-            URLSession.shared.dataTask(with: request) { data, response, error in
-                if let error = error {
-                    print("Failed to log out: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    print("Invalid response from server.")
-                    return
-                }
-
-                if httpResponse.statusCode == 200 {
-                    print("Successfully logged out.")
-
-                    //로그아웃 후 자동 로그인 차단을 위해 데이터 삭제
-                    DispatchQueue.main.async {
-                        // 자동 로그인 차단을 위해 isLoggedOut 플래그 설정
-                        UserDefaults.standard.set(true, forKey: "isLoggedOut")
-
-                        // 모든 사용자 정보 삭제
-                        UserDefaults.standard.removeObject(forKey: "userID")
-                        UserDefaults.standard.removeObject(forKey: "accessToken")
-                        UserDefaults.standard.removeObject(forKey: "refreshToken")
-                        UserDefaults.standard.removeObject(forKey: "authorizationCode")
-                        
-                        
-                        // 즉시 동기화
-                        UserDefaults.standard.synchronize()
-
-                        // ContentView로 돌아가기 (자동 로그인 차단 상태)
-                        UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
-                    }
-
-                } else {
-                    print("Failed to log out. Status code: \(httpResponse.statusCode)")
-                }
-            }.resume()
-        }
-
     }
 }
+
 
 
 #Preview {
