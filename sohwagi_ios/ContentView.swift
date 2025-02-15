@@ -566,30 +566,10 @@ struct WebViewWrapper: UIViewRepresentable {
                     print("User requested account deletion")
                     handleDeleteAccount()
                 }
-            } else if message.name == "RefreshEndHandler", let messageBody = message.body as? String {
-                if messageBody == "refreshend" {
-                    print("User requested refreshhandler")
-                    RefreshLogout()
-                }
             }
         }
         
-        func RefreshLogout() {
-            
-            UserDefaults.standard.set(true, forKey: "isLoggedOut")
 
-            // 모든 사용자 데이터 삭제
-            UserDefaults.standard.removeObject(forKey: "userID")
-            UserDefaults.standard.removeObject(forKey: "accessToken")
-            UserDefaults.standard.removeObject(forKey: "refreshToken")
-            UserDefaults.standard.removeObject(forKey: "authorizationCode")
-
-            // 즉시 반영
-            UserDefaults.standard.synchronize()
-
-            // ContentView로 돌아가기
-            UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
-        }
         
 
         func sendTokensToWebView() {
