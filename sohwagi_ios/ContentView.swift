@@ -9,7 +9,7 @@ struct HomeIndicatorBackgroundView: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .white
         
-        // ✅ 홈 인디케이터 높이에 맞춰 배경 설정
+        // 홈 인디케이터 높이에 맞춰 배경 설정
         if let window = UIApplication.shared.windows.first {
             let bottomPadding = window.safeAreaInsets.bottom
             view.frame = CGRect(x: 0, y: UIScreen.main.bounds.height - bottomPadding, width: UIScreen.main.bounds.width, height: bottomPadding)
@@ -501,14 +501,21 @@ class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAut
     }
 }
 
+class CustomWKWebView: WKWebView {
+    override var inputAccessoryView: UIView? {
+        return nil  // 키보드 위 액세서리 뷰 제거
+    }
+}
+
 struct WebViewWrapper: UIViewRepresentable {
     let url: URL
     var userInfo: [String: String]
 
     func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        //let webView = WKWebView()
+        let webView = CustomWKWebView()
         
-        // ✅ Safe Area에 의해 자동 조정되지 않도록 설정
+        // Safe Area에 의해 자동 조정되지 않도록 설정
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         
         webView.configuration.preferences.javaScriptEnabled = true
@@ -559,8 +566,31 @@ struct WebViewWrapper: UIViewRepresentable {
                     print("User requested account deletion")
                     handleDeleteAccount()
                 }
+            } else if message.name == "RefreshEndHandler", let messageBody = message.body as? String {
+                if messageBody == "refreshend" {
+                    print("User requested refreshhandler")
+                    RefreshLogout()
+                }
             }
         }
+        
+        func RefreshLogout() {
+            
+            UserDefaults.standard.set(true, forKey: "isLoggedOut")
+
+            // 모든 사용자 데이터 삭제
+            UserDefaults.standard.removeObject(forKey: "userID")
+            UserDefaults.standard.removeObject(forKey: "accessToken")
+            UserDefaults.standard.removeObject(forKey: "refreshToken")
+            UserDefaults.standard.removeObject(forKey: "authorizationCode")
+
+            // 즉시 반영
+            UserDefaults.standard.synchronize()
+
+            // ContentView로 돌아가기
+            UIApplication.shared.windows.first?.rootViewController = UIHostingController(rootView: ContentView())
+        }
+        
 
         func sendTokensToWebView() {
             guard isWebViewReady, let webView = webView else {
