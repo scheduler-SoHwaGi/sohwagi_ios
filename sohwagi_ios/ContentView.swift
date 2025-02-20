@@ -9,6 +9,8 @@ struct HomeIndicatorBackgroundView: UIViewRepresentable {
         let view = UIView()
         view.backgroundColor = .white
         
+        
+        
         // 홈 인디케이터 높이에 맞춰 배경 설정
         if let window = UIApplication.shared.windows.first {
             let bottomPadding = window.safeAreaInsets.bottom
@@ -515,11 +517,14 @@ struct WebViewWrapper: UIViewRepresentable {
         //let webView = WKWebView()
         let webView = CustomWKWebView()
         
+        
         // Safe Area에 의해 자동 조정되지 않도록 설정
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         
         webView.configuration.preferences.javaScriptEnabled = true
         let contentController = webView.configuration.userContentController
+        webView.allowsBackForwardNavigationGestures = true // 스와이프
+
 
         // JavaScript 메시지 핸들러 추가
         contentController.add(context.coordinator, name: "webViewReady")
@@ -550,6 +555,11 @@ struct WebViewWrapper: UIViewRepresentable {
         init(_ parent: WebViewWrapper) {
             self.parent = parent
         }
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+                print("현재 URL: \(webView.url?.absoluteString ?? "없음")")
+                print("뒤로 가기 가능? \(webView.canGoBack)")
+            }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "webViewReady" {
