@@ -534,6 +534,9 @@ struct WebViewWrapper: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.isInspectable = true
         webView.load(URLRequest(url: url))
+        
+        //웹뷰 url 감지
+        webView.addObserver(context.coordinator, forKeyPath: "URL", options: .new, context: nil)
 
         // Coordinator에 WebView 참조 전달
         context.coordinator.webView = webView
@@ -556,10 +559,53 @@ struct WebViewWrapper: UIViewRepresentable {
             self.parent = parent
         }
         
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-                print("현재 URL: \(webView.url?.absoluteString ?? "없음")")
-                print("뒤로 가기 가능? \(webView.canGoBack)")
+        override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+                if keyPath == "URL", let webView = object as? WKWebView {
+                    let currentURL = webView.url?.absoluteString ?? ""
+                    print("관찰된 URL 변경: \(currentURL)")
+                    updateSwipeGesture(for: currentURL, in: webView)
+                }
             }
+        
+        func updateSwipeGesture(for currentURL: String, in webView: WKWebView) {
+            // URL 끝에 "/"가 있으면 제거하여 정규화
+            let normalizedURL = currentURL.hasSuffix("/") ? String(currentURL.dropLast()) : currentURL
+            
+            // 두 URL 조건을 체크: schedule 페이지와 PlusPage 관련 페이지
+            if normalizedURL == "https://sohawgi-front.vercel.app" || normalizedURL.contains("PlusPage") {
+                webView.allowsBackForwardNavigationGestures = false
+                webView.gestureRecognizers?.forEach { gesture in
+                    if let panGesture = gesture as? UIScreenEdgePanGestureRecognizer {
+                        panGesture.isEnabled = false
+                    }
+                }
+                print("해당 페이지(\(normalizedURL))이므로 스와이프 제스처 비활성화")
+            } else {
+                webView.allowsBackForwardNavigationGestures = true
+                webView.gestureRecognizers?.forEach { gesture in
+                    if let panGesture = gesture as? UIScreenEdgePanGestureRecognizer {
+                        panGesture.isEnabled = true
+                    }
+                }
+                print("스와이프 제스처 활성화 (현재 URL: \(normalizedURL))")
+            }
+        }
+
+        
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard let currentURL = webView.url?.absoluteString else { return }
+            print("현재 URL: \(currentURL)")
+            
+            updateSwipeGesture(for: currentURL, in: webView)
+        
+        }
+        
+        deinit {
+                // observer 제거
+                webView?.removeObserver(self, forKeyPath: "URL")
+            }
+
+
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "webViewReady" {
