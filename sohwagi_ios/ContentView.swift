@@ -4,6 +4,12 @@ import FirebaseMessaging
 import WebKit
 import UIKit
 
+#if DEV
+let webViewURL = URL(string: "https://sohawgi-front-git-dev-yurim222s-projects.vercel.app/")!
+#else
+let webViewURL = URL(string: "https://sohawgi-front.vercel.app/")!
+#endif
+
 struct HomeIndicatorBackgroundView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
@@ -30,6 +36,14 @@ struct ContentView: View {
     @State private var showWebView = false // 자동 로그인 성공 시 웹뷰로 이동
     @State private var userInfo: [String: String] = [:] // 사용자 정보 저장
     @State private var isCheckingLogin = true // 로그인 확인 중인지 여부
+    
+    init() {
+            #if DEV
+            print("DEV 앱 실행 중 (https://sohawgi-front-git-dev-yurim222s-projects.vercel.app/)")
+            #else
+            print("PROD 앱 실행 중 (https://sohawgi-front.vercel.app/)")
+            #endif
+        }
 
     var body: some View {
         ZStack {
@@ -48,7 +62,7 @@ struct ContentView: View {
                     Color.clear.ignoresSafeArea()
                 } else if showWebView {
                     ZStack {
-                        WebViewWrapper(url: URL(string: "https://sohawgi-front.vercel.app/")!, userInfo: userInfo)
+                        WebViewWrapper(url: webViewURL, userInfo: userInfo)
                             .edgesIgnoringSafeArea(.all)
 
                         // ✅ 홈 인디케이터 배경을 가장 아래에 배치하여 실제 홈 인디케이터 배경으로 사용
@@ -141,7 +155,7 @@ struct LoginView: View {
 
             // 웹뷰
             if showWebView {
-                WebViewWrapper(url: URL(string: "https://sohawgi-front.vercel.app/")!, userInfo: userInfo)
+                WebViewWrapper(url: webViewURL, userInfo: userInfo)
                     .edgesIgnoringSafeArea(.all)
             }
         }
